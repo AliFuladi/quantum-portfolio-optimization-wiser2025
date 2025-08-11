@@ -73,7 +73,8 @@ python -m src.main
 
 
 ## Summary:
-QAOA matches classical results for small portfolios
-Classical solver is faster on current hardware
-Quantum approach shows scalability potential with future quantum processors
+. QAOA matches classical results for small portfolios
+. Classical solver is faster on current hardware
+. Quantum approach shows scalability potential with future quantum processors
+
 
