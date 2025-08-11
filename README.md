@@ -57,3 +57,22 @@ gurobipy==12.0.3
 ```bash
 python -m src.main
 ```
+
+## The program will:
+1. Fetch historical asset data
+2. Build and solve the QUBO model
+3. Compare classical and QAOA solutions
+4. Save results in results/ folder
+
+## Results
+    solutions_<timestamp>.csv
+  — CSV with optimization results from both classical and QAOA solutions
+    
+    portfolio_weights_<timestamp>.png
+  — Bar chart of portfolio composition for both methods
+
+
+## Summary:
+  QAOA matches classical results for small portfolios
+  Classical solver is faster on current hardware
+  Quantum approach shows scalability potential with future quantum processors
