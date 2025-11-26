@@ -83,3 +83,130 @@ On this small instance, QAOA often finds exactly the same portfolio as the class
 │  ├─ solver.py           # Classical solver, QAOA solver, penalty search
 │  └─ utils.py            # Saving results, plots, tiny reporting helpers
 └─ results/               # Created at runtime; CSV, plots, markdown reports
+
+The `results/` folder is created automatically on the first run.
+
+```
+
+## 4. Environment and Dependencies
+
+This project is intended to run with **Python 3.11.x**.
+
+Install dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+requirements.txt:
+
+```text
+# Tested with Python 3.11.x
+numpy==1.24.4
+pandas==2.0.3
+matplotlib==3.7.2
+scikit-learn==1.3.2
+
+qiskit==0.45.1
+qiskit-algorithms==0.2.1
+qiskit-optimization==0.6.0
+qiskit-aer==0.12.2
+
+yfinance==0.2.65
+```
+
+A typical workflow is:
+
+```bash
+python -m venv .qpowvenv
+.\.qpowvenv\Scripts\activate
+pip install -r requirements.txt
+```
+
+---
+
+## 5. How to Run
+
+From the repository root:
+
+```bash
+python -m src.main
+```
+
+The script will:
+
+Download historical daily prices for the selected tickers.
+
+Compute expected returns and the annualised covariance matrix.
+
+Build the quadratic optimization model with a budget constraint.
+
+Solve it once with a classical eigensolver.
+
+Convert the model to a QUBO, search for a reasonable penalty, and run QAOA on it.
+
+Compute portfolio-level metrics for both solutions.
+
+Save CSV results, plots, and a small markdown comparison report in the results/ folder.
+
+---
+
+## 6. Outputs
+
+Each run creates time-stamped files in results/:
+
+solutions_<timestamp>.csv
+
+Asset names
+
+Binary selection vectors for the classical and QAOA solvers
+
+weights_comparison_<timestamp>.png
+
+Bar chart comparing normalised portfolio weights
+
+One bar per asset for the classical and QAOA portfolios
+
+efficient_frontier_<timestamp>.png
+
+Scatter plot of random portfolios in (risk, return) space
+
+Marked points for the classical and QAOA portfolios
+
+comparison_report_<timestamp>.md
+
+Short markdown report listing which assets were selected
+
+If a previous run exists, shows how the selections changed between runs
+
+---
+
+## 7. What the Results Show
+
+On this small test case:
+
+The classical solver reliably finds a portfolio on the upper part of the sampled efficient frontier and does so very quickly.
+
+QAOA:
+
+Often matches the classical solution exactly (same assets, same risk/return).
+
+Sometimes returns a slightly different feasible portfolio with a very similar risk–return profile.
+
+This is consistent with the behaviour of variational quantum algorithms on NISQ-style simulators: they can approximate good solutions to combinatorial problems and, with the right encoding and penalties, stay close to the classical optimum.
+
+This project is deliberately modest in scope: it is a proof of concept that shows how to wire together:
+
+real market data,
+
+a simple Markowitz-style model,
+
+QUBO encoding, and
+
+a hybrid quantum–classical solver pipeline.
+
+From here, natural next steps would be to experiment with more realistic constraints, different cost functions, and larger universes of assets as quantum hardware and algorithms improve.
+
+```makefile
+::contentReference[oaicite:0]{index=0}
+```
