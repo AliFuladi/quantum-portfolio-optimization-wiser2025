@@ -5,16 +5,9 @@ import matplotlib.pyplot as plt
 import os
 
 
-def save_results(file_name: str, data: dict, timestamp: str, output_dir="results"):
-    """
-    Saves optimization results to a CSV file with a timestamp.
-
-    Args:
-        file_name (str): The base name of the file to save the data to.
-        data (dict): A dictionary containing the results.
-        timestamp (str): The timestamp to append to the file name.
-        output_dir (str): The directory where the results will be saved.
-    """
+def save_results(file_name: str, data: dict, timestamp: str, output_dir: str = "results") -> None:
+    """Dump the current run's solutions to a timestamped CSV inside `output_dir`."""
+    ...
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -26,18 +19,15 @@ def save_results(file_name: str, data: dict, timestamp: str, output_dir="results
     print(f"Results saved to {file_path}")
 
 
-def plot_portfolio_weights(qaoa_solution: np.array, classical_solution: np.array, file_name: str, timestamp: str, asset_names: list, output_dir="results"):
-    """
-    Creates and saves a bar chart comparing the two solutions with a timestamp.
-
-    Args:
-        qaoa_solution (np.array): The solution from the QAOA algorithm.
-        classical_solution (np.array): The solution from the classical optimizer.
-        file_name (str): The base name of the file to save the plot to.
-        timestamp (str): The timestamp to append to the file name.
-        asset_names (list): List of asset names.
-        output_dir (str): The directory where the plots will be saved.
-    """
+def plot_portfolio_weights(
+    qaoa_solution: np.ndarray,
+    classical_solution: np.ndarray,
+    file_name: str,
+    timestamp: str,
+    asset_names: list,
+    output_dir: str = "results",
+) -> None:
+    """Bar-plot of QAOA vs classical selections / weights."""
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -123,10 +113,14 @@ def plot_efficient_frontier(expected_returns: np.array, covariance_matrix: np.ar
     print(f"Efficient frontier plot saved to {file_path}")
 
 
-def generate_comparison_report(report_file_path: str, current_results: pd.DataFrame, previous_results: pd.DataFrame, timestamp: str, asset_names: list):
-    """
-    Generates a Markdown report comparing the latest run with the previous one.
-    """
+def generate_comparison_report(
+    report_file_path: str,
+    current_results: pd.DataFrame,
+    previous_results: pd.DataFrame | None,
+    timestamp: str,
+    asset_names: list,
+) -> None:
+    """Write a small Markdown report comparing this run with the previous one (if any)."""
     with open(report_file_path, 'w', encoding='utf-8') as f:
         f.write(f"# Portfolio Optimization Run Report - {timestamp}\n\n")
         f.write("## 1. Solutions\n")
@@ -201,3 +195,4 @@ def calculate_portfolio_metrics(solution: np.array, expected_returns: np.array, 
         np.dot(weights.T, np.dot(covariance_matrix, weights)))
 
     return portfolio_return, portfolio_risk
+
