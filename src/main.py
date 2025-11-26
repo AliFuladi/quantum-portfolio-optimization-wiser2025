@@ -1,5 +1,6 @@
 # src/main.py
 import os
+import random
 from datetime import datetime
 
 import numpy as np
@@ -20,6 +21,10 @@ from src.utils import (
 def main() -> None:
     """Run one end-to-end optimisation: data -> model -> classical + QAOA -> plots + report."""
 
+    # Fix random seeds so results are reproducible across runs
+    random.seed(42)
+    np.random.seed(42)
+    
     # --- Basic config for this toy project ---
     tickers = [
         "AAPL",
@@ -168,5 +173,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
