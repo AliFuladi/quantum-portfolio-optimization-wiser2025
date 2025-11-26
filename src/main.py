@@ -15,17 +15,8 @@ from qiskit_optimization.converters import QuadraticProgramToQubo
 from qiskit_optimization.problems import QuadraticProgram
 
 
-def find_latest_results_file(directory, file_prefix):
-    """
-    Finds the latest file in a directory that matches a given prefix.
-
-    Args:
-        directory (str): The directory to search in.
-        file_prefix (str): The prefix of the file name (e.g., 'solutions_').
-
-    Returns:
-        str: The full path to the latest file, or None if no file is found.
-    """
+def find_latest_results_file(directory: str, file_prefix: str) -> str | None:
+    """Return the most recent CSV file in `directory` that starts with `file_prefix`."""
     if not os.path.exists(directory):
         return None
     files = [os.path.join(directory, f) for f in os.listdir(
@@ -37,10 +28,8 @@ def find_latest_results_file(directory, file_prefix):
 
 
 def main():
-    """
-    Main function to run the advanced end-to-end portfolio optimization project.
-    """
-    print("--- Advanced Portfolio Optimization Project ---")
+    """Entry point for running the portfolio optimization pipeline."""
+    print("--- Portfolio optimization run ---")
 
     # Generate a unique timestamp for this run
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -61,13 +50,13 @@ def main():
         stock_data, risk_factor, num_assets_to_select)
 
     # --- Step 2: Classical Optimization ---
-    print("\n2. Formulating and solving with a classical optimizer (NumPyMinimumEigensolver)...")
+    print("\n2. Solving the model classically (NumPyMinimumEigensolver)...")
     qp = create_quadratic_program(
         expected_returns, covariance_matrix, num_assets_to_select)
     classical_solution = solve_with_classical_optimizer(qp)
 
     # --- Step 3: QAOA Optimization ---
-    print("\n3. Solving with a quantum-inspired optimizer (QAOA)...")
+    print("\n3. Solving the same model with QAOA...")
     penalty_range = np.arange(10, 201, 10)
     best_penalty = find_best_penalty(qp, penalty_range)
 
@@ -85,8 +74,7 @@ def main():
     plot_portfolio_weights(qaoa_solution, classical_solution,
                            'weights_comparison', timestamp, asset_names)
 
-    # Plot the efficient frontier, passing the classical and QAOA solutions
-    # The plot_efficient_frontier function has been updated to accept these.
+    # Plot the efficient frontier and highlight both solutions
     plot_efficient_frontier(expected_returns, covariance_matrix,
                             classical_solution, qaoa_solution, 'efficient_frontier', timestamp)
 
@@ -129,3 +117,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
