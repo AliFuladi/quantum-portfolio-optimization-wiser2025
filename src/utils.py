@@ -1,22 +1,25 @@
 # src/utils.py
+import os
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
 
-def save_results(file_name: str, data: dict, timestamp: str, output_dir: str = "results") -> None:
-    """Dump the current run's solutions to a timestamped CSV inside `output_dir`."""
-    ...
+def save_results(file_name: str, data: dict, timestamp: str, output_dir: str = "results") -> str:
+    """Save the current run's results as a CSV in `output_dir` and return the file path."""
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    final_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.csv"
+    base = os.path.splitext(file_name)[0]
+    final_file_name = f"{base}_{timestamp}.csv"
+    file_path = os.path.join(output_dir, final_file_name)
 
     df = pd.DataFrame(data)
-    file_path = os.path.join(output_dir, final_file_name)
     df.to_csv(file_path, index=False)
     print(f"Results saved to {file_path}")
+    return file_path
 
 
 def plot_portfolio_weights(
@@ -26,173 +29,200 @@ def plot_portfolio_weights(
     timestamp: str,
     asset_names: list,
     output_dir: str = "results",
-) -> None:
-    """Bar-plot of QAOA vs classical selections / weights."""
+) -> str:
+    """Create a bar plot comparing classical vs QAOA portfolio weights."""
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    final_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.png"
-    file_path = os.path.join(output_dir, final_file_name)
+    idx = np.arange(len(asset_names))
+    width = 0.35
 
-    # Convert binary solutions to portfolio weights
-    qaoa_weights = qaoa_solution / \
-        np.sum(qaoa_solution) if np.sum(
-            qaoa_solution) > 0 else np.zeros(len(qaoa_solution))
-    classical_weights = classical_solution / np.sum(classical_solution) if np.sum(
-        classical_solution) > 0 else np.zeros(len(classical_solution))
+    if classical_solution.sum() > 0:
+        classical_weights = classical_solution / classical_solution.sum()
+    else:
+        classical_weights = np.zeros_like(classical_solution)
 
-    df = pd.DataFrame({
-        'Asset': asset_names,
-        'QAOA Solution': qaoa_weights,
-        'Classical Solution': classical_weights
-    }).set_index('Asset')
+    if qaoa_solution.sum() > 0:
+        qaoa_weights = qaoa_solution / qaoa_solution.sum()
+    else:
+        qaoa_weights = np.zeros_like(qaoa_solution)
 
-    df.plot(kind='bar', figsize=(12, 7))
-    plt.title(f'Portfolio Weights Comparison ({timestamp})')
-    plt.xlabel('Assets')
-    plt.ylabel('Weight')
-    plt.xticks(rotation=45, ha='right')
+    plt.figure(figsize=(10, 5))
+    plt.bar(idx - width / 2, classical_weights, width, label="Classical")
+    plt.bar(idx + width / 2, qaoa_weights, width, label="QAOA")
+
+    plt.xticks(idx, asset_names, rotation=45, ha="right")
+    plt.ylabel("Weight")
+    plt.title("Portfolio weights: classical vs QAOA")
+    plt.legend()
     plt.tight_layout()
+
+    base = os.path.splitext(file_name)[0]
+    final_file_name = f"{base}_{timestamp}.png"
+    file_path = os.path.join(output_dir, final_file_name)
     plt.savefig(file_path)
     plt.close()
-    print(f"Portfolio weights plot saved to {file_path}")
+    print(f"Weights plot saved to {file_path}")
+    return file_path
 
 
-def plot_efficient_frontier(expected_returns: np.array, covariance_matrix: np.array, classical_solution: np.array, qaoa_solution: np.array, file_name: str, timestamp: str, output_dir="results"):
-    """
-    Plots the efficient frontier for the given portfolio data, and marks the classical and QAOA solutions.
-    """
+def _portfolio_summary(
+    solution: np.ndarray,
+    expected_returns: np.ndarray,
+    covariance_matrix,
+) -> Tuple[float, float]:
+    """Return (expected_return, risk) for a given 0/1 selection vector."""
+    selection = np.asarray(solution, dtype=float)
+    if selection.sum() == 0:
+        return 0.0, 0.0
+
+    weights = selection / selection.sum()
+
+    if hasattr(covariance_matrix, "values"):
+        cov = covariance_matrix.values
+    else:
+        cov = np.array(covariance_matrix)
+
+    portfolio_return = float(weights @ expected_returns)
+    portfolio_risk = float(np.sqrt(weights.T @ cov @ weights))
+    return portfolio_return, portfolio_risk
+
+
+def plot_efficient_frontier(
+    expected_returns: np.ndarray,
+    covariance_matrix,
+    classical_solution: np.ndarray,
+    qaoa_solution: np.ndarray,
+    file_name: str,
+    timestamp: str,
+    output_dir: str = "results",
+) -> str:
+    """Plot random portfolios plus the classical and QAOA points."""
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    final_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.png"
-    file_path = os.path.join(output_dir, final_file_name)
-
     num_assets = len(expected_returns)
-    num_portfolios = 5000
+    if hasattr(covariance_matrix, "values"):
+        cov = covariance_matrix.values
+    else:
+        cov = np.array(covariance_matrix)
 
-    results = np.zeros((3, num_portfolios))
+    num_portfolios = 2000
+    all_returns = []
+    all_risks = []
 
-    for i in range(num_portfolios):
-        weights = np.random.random(num_assets)
-        weights /= np.sum(weights)
+    for _ in range(num_portfolios):
+        weights = np.random.rand(num_assets)
+        weights /= weights.sum()
 
-        portfolio_return = np.sum(expected_returns * weights)
-        portfolio_std_dev = np.sqrt(
-            np.dot(weights.T, np.dot(covariance_matrix, weights)))
+        r = float(weights @ expected_returns)
+        s = float(np.sqrt(weights.T @ cov @ weights))
 
-        results[0, i] = portfolio_std_dev
-        results[1, i] = portfolio_return
-        results[2, i] = portfolio_return / portfolio_std_dev  # Sharpe Ratio
+        all_returns.append(r)
+        all_risks.append(s)
 
-    plt.figure(figsize=(12, 7))
-    plt.scatter(results[0, :], results[1, :], c=results[2, :],
-                cmap='viridis', s=20, label='Random Portfolios')
-    plt.colorbar(label='Sharpe Ratio')
+    classical_return, classical_risk = _portfolio_summary(
+        classical_solution, expected_returns, cov
+    )
+    qaoa_return, qaoa_risk = _portfolio_summary(
+        qaoa_solution, expected_returns, cov
+    )
 
-    # Calculate and plot the classical solution's point
-    classical_return, classical_risk = calculate_portfolio_metrics(
-        classical_solution, expected_returns, covariance_matrix)
-    plt.scatter(classical_risk, classical_return, marker='*',
-                s=200, color='red', label='Classical Solution')
+    plt.figure(figsize=(8, 5))
+    plt.scatter(all_risks, all_returns, alpha=0.3, s=10, label="Random portfolios")
+    if classical_solution.sum() > 0:
+        plt.scatter(
+            [classical_risk],
+            [classical_return],
+            marker="x",
+            s=80,
+            label="Classical",
+        )
+    if qaoa_solution.sum() > 0:
+        plt.scatter(
+            [qaoa_risk],
+            [qaoa_return],
+            marker="o",
+            s=80,
+            label="QAOA",
+        )
 
-    # Calculate and plot the QAOA solution's point, now with a blue star
-    qaoa_return, qaoa_risk = calculate_portfolio_metrics(
-        qaoa_solution, expected_returns, covariance_matrix)
-    plt.scatter(qaoa_risk, qaoa_return, marker='*', s=200,
-                color='blue', label='QAOA Solution')
-
-    plt.title(f'Efficient Frontier ({timestamp})')
-    plt.xlabel('Expected Volatility (Standard Deviation)')
-    plt.ylabel('Expected Return')
+    plt.xlabel("Risk (volatility)")
+    plt.ylabel("Expected return")
+    plt.title("Toy efficient frontier")
     plt.legend()
-    plt.grid(True)
     plt.tight_layout()
+
+    base = os.path.splitext(file_name)[0]
+    final_file_name = f"{base}_{timestamp}.png"
+    file_path = os.path.join(output_dir, final_file_name)
     plt.savefig(file_path)
     plt.close()
     print(f"Efficient frontier plot saved to {file_path}")
+    return file_path
 
 
 def generate_comparison_report(
     report_file_path: str,
     current_results: pd.DataFrame,
-    previous_results: pd.DataFrame | None,
+    previous_results,
     timestamp: str,
     asset_names: list,
 ) -> None:
-    """Write a small Markdown report comparing this run with the previous one (if any)."""
-    with open(report_file_path, 'w', encoding='utf-8') as f:
-        f.write(f"# Portfolio Optimization Run Report - {timestamp}\n\n")
+    """Generate a small Markdown report comparing this run to the previous one (if any)."""
+    with open(report_file_path, "w", encoding="utf-8") as f:
+        f.write(f"# Portfolio optimisation run - {timestamp}\n\n")
         f.write("## 1. Solutions\n")
-        f.write("### Portfolio Weights\n")
+        f.write("### Portfolio selections\n")
         f.write(
-            "Here is a comparison of the selected assets by the Classical and QAOA solvers.\n\n")
+            "Here is a comparison of the assets selected by the classical and QAOA solvers.\n\n"
+        )
 
-        # Use markdown table for solutions
         f.write("| Asset | Classical Solution | QAOA Solution |\n")
         f.write("|-------|--------------------|---------------|\n")
         for idx, asset in enumerate(asset_names):
-            classical_val = '✅' if current_results['Classical Solution'][idx] == 1 else '❌'
-            qaoa_val = '✅' if current_results['QAOA Solution'][idx] == 1 else '❌'
+            classical_val = "✅" if current_results["Classical Solution"][idx] == 1 else "❌"
+            qaoa_val = "✅" if current_results["QAOA Solution"][idx] == 1 else "❌"
             f.write(f"| {asset} | {classical_val} | {qaoa_val} |\n")
         f.write("\n")
 
         if previous_results is not None:
-            f.write("## 2. Comparison with Previous Run\n")
+            f.write("## 2. Comparison with previous run\n")
             f.write(
-                "This section compares the current run's results with the most recent previous run.\n\n")
+                "This section shows how the selections changed compared to the previous run.\n\n"
+            )
 
-            # Convert solutions to a more readable format for the report
-            current_classical_assets = ', '.join([asset_names[i] for i, x in enumerate(
-                current_results['Classical Solution']) if x == 1])
-            previous_classical_assets = ', '.join([asset_names[i] for i, x in enumerate(
-                previous_results['Classical Solution']) if x == 1])
+            current_classical_assets = ", ".join(
+                asset_names[i]
+                for i, x in enumerate(current_results["Classical Solution"])
+                if x == 1
+            )
+            previous_classical_assets = ", ".join(
+                asset_names[i]
+                for i, x in enumerate(previous_results["Classical Solution"])
+                if x == 1
+            )
 
-            current_qaoa_assets = ', '.join([asset_names[i] for i, x in enumerate(
-                current_results['QAOA Solution']) if x == 1])
-            previous_qaoa_assets = ', '.join([asset_names[i] for i, x in enumerate(
-                previous_results['QAOA Solution']) if x == 1])
+            current_qaoa_assets = ", ".join(
+                asset_names[i]
+                for i, x in enumerate(current_results["QAOA Solution"])
+                if x == 1
+            )
+            previous_qaoa_assets = ", ".join(
+                asset_names[i]
+                for i, x in enumerate(previous_results["QAOA Solution"])
+                if x == 1
+            )
 
-            f.write("### Classical Solution Change\n")
-            f.write(f"- **Current Run:** {current_classical_assets}\n")
-            f.write(f"- **Previous Run:** {previous_classical_assets}\n\n")
+            f.write("### Classical solution change\n")
+            f.write(f"- **Current run:** {current_classical_assets or 'none'}\n")
+            f.write(f"- **Previous run:** {previous_classical_assets or 'none'}\n\n")
 
-            f.write("### QAOA Solution Change\n")
-            f.write(f"- **Current Run:** {current_qaoa_assets}\n")
-            f.write(f"- **Previous Run:** {previous_qaoa_assets}\n\n")
-
+            f.write("### QAOA solution change\n")
+            f.write(f"- **Current run:** {current_qaoa_assets or 'none'}\n")
+            f.write(f"- **Previous run:** {previous_qaoa_assets or 'none'}\n\n")
         else:
-            f.write("## 2. Comparison with Previous Run\n")
-            f.write("No previous run data found for comparison.\n\n")
+            f.write("## 2. Comparison with previous run\n")
+            f.write("No previous run found to compare against.\n\n")
 
-    print(f"Comparison report generated and saved to {report_file_path}")
-
-
-def calculate_portfolio_metrics(solution: np.array, expected_returns: np.array, covariance_matrix: np.array):
-    """
-    Calculates the expected return and risk (volatility) of a portfolio based on a given solution.
-
-    Args:
-        solution (np.array): A binary array where 1 means the asset is selected, 0 otherwise.
-        expected_returns (np.array): The expected returns for each asset.
-        covariance_matrix (np.array): The covariance matrix of the assets.
-
-    Returns:
-        tuple: A tuple containing (portfolio_return, portfolio_risk).
-    """
-    selected_assets = solution
-    if np.sum(selected_assets) == 0:
-        return 0, 0
-
-    # For selected assets, normalize the weights to sum to 1
-    weights = selected_assets / np.sum(selected_assets)
-
-    # Calculate portfolio return
-    portfolio_return = np.dot(weights, expected_returns)
-
-    # Calculate portfolio risk (standard deviation)
-    portfolio_risk = np.sqrt(
-        np.dot(weights.T, np.dot(covariance_matrix, weights)))
-
-    return portfolio_return, portfolio_risk
-
+    print(f"Comparison report generated at {report_file_path}")
