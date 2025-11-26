@@ -8,8 +8,14 @@ from sklearn.linear_model import LinearRegression
 def fetch_stock_data(tickers: list, start_date: str, end_date: str) -> pd.DataFrame:
     """Download adjusted close prices for the given tickers and date range."""
     print(f"Downloading data for {tickers} from {start_date} to {end_date} ...")
-    raw = yf.download(tickers, start=start_date, end=end_date)
-
+    raw = yf.download(
+        tickers,
+        start=start_date,
+        end=end_date,
+        auto_adjust=True,
+        progress=False,
+    )
+    
     # On recent yfinance versions "Close" already contains (adjusted) prices
     if isinstance(raw, pd.DataFrame) and "Close" in raw.columns:
         data = raw["Close"]
@@ -61,3 +67,4 @@ def calculate_portfolio_metrics(
     covariance_matrix = returns.cov() * 252
 
     return predicted_returns, covariance_matrix, asset_names
+
