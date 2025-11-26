@@ -84,9 +84,9 @@ On this small instance, QAOA often finds exactly the same portfolio as the class
 │  └─ utils.py            # Saving results, plots, tiny reporting helpers
 └─ results/               # Created at runtime; CSV, plots, markdown reports
 
-The `results/` folder is created automatically on the first run.
-
 ```
+
+The `results/` folder is created automatically on the first run.
 
 ---
 
@@ -189,8 +189,3 @@ This project is deliberately modest in scope: it is a proof of concept that show
 4. a hybrid quantum–classical solver pipeline.
 
 From here, natural next steps would be to experiment with more realistic constraints, different cost functions, and larger universes of assets as quantum hardware and algorithms improve.
-
-```makefile
-::contentReference[oaicite:0]{index=0}
-```
-
