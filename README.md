@@ -88,6 +88,8 @@ The `results/` folder is created automatically on the first run.
 
 ```
 
+---
+
 ## 4. Environment and Dependencies
 
 This project is intended to run with **Python 3.11.x**.
@@ -135,49 +137,35 @@ python -m src.main
 
 The script will:
 
-Download historical daily prices for the selected tickers.
-
-Compute expected returns and the annualised covariance matrix.
-
-Build the quadratic optimization model with a budget constraint.
-
-Solve it once with a classical eigensolver.
-
-Convert the model to a QUBO, search for a reasonable penalty, and run QAOA on it.
-
-Compute portfolio-level metrics for both solutions.
-
-Save CSV results, plots, and a small markdown comparison report in the results/ folder.
+1. Download historical daily prices for the selected tickers.
+2. Compute expected returns and the annualised covariance matrix.
+3. Build the quadratic optimization model with a budget constraint.
+4. Solve it once with a classical eigensolver.
+5. Convert the model to a QUBO, search for a reasonable penalty, and run QAOA on it.
+6. Compute portfolio-level metrics for both solutions.
+7. Save CSV results, plots, and a small markdown comparison report in the `results/` folder.
 
 ---
 
 ## 6. Outputs
 
-Each run creates time-stamped files in results/:
+Each run creates time-stamped files in `results/`:
 
-solutions_<timestamp>.csv
+- `solutions_<timestamp>.csv`
+   - Asset names
+   - Binary selection vectors for the classical and QAOA solvers
 
-Asset names
+- `weights_comparison_<timestamp>.png`
+   - Bar chart comparing normalised portfolio weights
+   - One bar per asset for the classical and QAOA portfolios
 
-Binary selection vectors for the classical and QAOA solvers
+- `efficient_frontier_<timestamp>.png`
+   - Scatter plot of random portfolios in (risk, return) space
+   - Marked points for the classical and QAOA portfolios
 
-weights_comparison_<timestamp>.png
-
-Bar chart comparing normalised portfolio weights
-
-One bar per asset for the classical and QAOA portfolios
-
-efficient_frontier_<timestamp>.png
-
-Scatter plot of random portfolios in (risk, return) space
-
-Marked points for the classical and QAOA portfolios
-
-comparison_report_<timestamp>.md
-
-Short markdown report listing which assets were selected
-
-If a previous run exists, shows how the selections changed between runs
+- `comparison_report_<timestamp>.md`
+   - Short markdown report listing which assets were selected
+   - If a previous run exists, shows how the selections changed between runs
 
 ---
 
@@ -185,28 +173,24 @@ If a previous run exists, shows how the selections changed between runs
 
 On this small test case:
 
-The classical solver reliably finds a portfolio on the upper part of the sampled efficient frontier and does so very quickly.
+- The classical solver reliably finds a portfolio on the upper part of the sampled efficient frontier and does so very quickly.
 
-QAOA:
+- QAOA:
+   - Often matches the classical solution exactly (same assets, same risk/return).
+   - Sometimes returns a slightly different feasible portfolio with a very similar risk–return profile.
 
-Often matches the classical solution exactly (same assets, same risk/return).
-
-Sometimes returns a slightly different feasible portfolio with a very similar risk–return profile.
-
-This is consistent with the behaviour of variational quantum algorithms on NISQ-style simulators: they can approximate good solutions to combinatorial problems and, with the right encoding and penalties, stay close to the classical optimum.
+- This is consistent with the behaviour of variational quantum algorithms on NISQ-style simulators: they can approximate good solutions to combinatorial problems and, with the right encoding and penalties, stay close to the classical optimum.
 
 This project is deliberately modest in scope: it is a proof of concept that shows how to wire together:
 
-real market data,
-
-a simple Markowitz-style model,
-
-QUBO encoding, and
-
-a hybrid quantum–classical solver pipeline.
+1. real market data,
+2. a simple Markowitz-style model,
+3. QUBO encoding,
+4. a hybrid quantum–classical solver pipeline.
 
 From here, natural next steps would be to experiment with more realistic constraints, different cost functions, and larger universes of assets as quantum hardware and algorithms improve.
 
 ```makefile
 ::contentReference[oaicite:0]{index=0}
 ```
+
