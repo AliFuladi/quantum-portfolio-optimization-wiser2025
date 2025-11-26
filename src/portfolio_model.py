@@ -6,10 +6,11 @@ import numpy as np
 
 def create_quadratic_program(
     expected_returns: np.ndarray,
-    covariance_matrix: np.ndarray,
+    covariance_matrix,
     num_assets_to_select: int,
+    risk_factor: float,
 ) -> QuadraticProgram:
-    """Build Qiskit's QuadraticProgram for the portfolio-selection problem."""
+    """Build the QuadraticProgram for the portfolio-selection toy model."""
     num_assets = len(expected_returns)
     qp = QuadraticProgram("portfolio_selection")
 
@@ -17,7 +18,7 @@ def create_quadratic_program(
     for i in range(num_assets):
         qp.binary_var(name=f"x_{i}")
 
-    # Budget: pick exactly `num_assets_to_select` names
+    # Budget constraint: pick exactly `num_assets_to_select` assets
     qp.linear_constraint(
         linear={f"x_{i}": 1 for i in range(num_assets)},
         sense="==",
@@ -25,16 +26,21 @@ def create_quadratic_program(
         name="budget",
     )
 
-    # Minimize -return + risk (classic Markowitz style)
-    linear_objective = -1 * expected_returns
+    # Objective: minimise -return + risk_factor * risk
+    linear_objective = -1.0 * expected_returns
 
-    # covariance_matrix is a DataFrame here; use raw values
-    quadratic_objective = covariance_matrix.values
+    if hasattr(covariance_matrix, "values"):
+        cov_values = covariance_matrix.values
+    else:
+        cov_values = np.array(covariance_matrix)
+
+    quadratic_objective = risk_factor * cov_values
+
     qp.minimize(linear=linear_objective, quadratic=quadratic_objective)
     return qp
 
 
 def get_qubo(qp: QuadraticProgram, penalty: float) -> QuadraticProgram:
-    """Convert the constrained problem into a QUBO using a simple penalty."""
-    qp_to_qubo = QuadraticProgramToQubo(penalty=penalty)
-    return qp_to_qubo.convert(qp)
+    """Convert the constrained model into a QUBO using a penalty method."""
+    converter = QuadraticProgramToQubo(penalty=penalty)
+    return converter.convert(qp)
