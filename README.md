@@ -189,3 +189,14 @@ This project is deliberately modest in scope: it is a proof of concept that show
 4. a hybrid quantum–classical solver pipeline.
 
 From here, natural next steps would be to experiment with more realistic constraints, different cost functions, and larger universes of assets as quantum hardware and algorithms improve.
+
+---
+
+## 8. Example Outputs
+
+The files in the `examples/` folder correspond to a run where QAOA returns a slightly different feasible portfolio compared to the classical solver, with a very similar risk–return profile. They are included only as a visual illustration of the outputs; the main results are always reproducible by running `python -m src.main`.
+
+
+
+
+
