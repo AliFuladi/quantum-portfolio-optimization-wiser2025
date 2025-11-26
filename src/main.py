@@ -82,6 +82,25 @@ def main() -> None:
         print("   Failed to find a sensible penalty; falling back to classical-only solution.")
         qaoa_solution = np.zeros_like(classical_solution)
 
+    # --- Quick summary of portfolio metrics based on the toy model ---
+    classical_ret, classical_risk = _portfolio_summary(
+        classical_solution, expected_returns, covariance_matrix
+    )
+
+    if qaoa_solution.sum() > 0:
+        qaoa_ret, qaoa_risk = _portfolio_summary(
+            qaoa_solution, expected_returns, covariance_matrix
+        )
+    else:
+        qaoa_ret, qaoa_risk = 0.0, 0.0
+
+    print("\n   Portfolio metrics (annualised, toy model):")
+    print(f"   Classical -> return={classical_ret:.4f}, risk={classical_risk:.4f}")
+    if qaoa_solution.sum() > 0:
+        print(f"   QAOA      -> return={qaoa_ret:.4f}, risk={qaoa_risk:.4f}")
+    else:
+        print("   QAOA      -> skipped (no feasible penalty)")
+
     # --- Step 6: save results, plots and comparison report ---
     print("\n6) Saving results and generating plots ...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -149,4 +168,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
