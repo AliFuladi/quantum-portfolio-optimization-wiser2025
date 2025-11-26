@@ -1,120 +1,150 @@
 # src/main.py
 import os
-import numpy as np
-import pandas as pd
 from datetime import datetime
 
-# Import all necessary modules
-from src.utils import save_results, plot_portfolio_weights, plot_efficient_frontier, generate_comparison_report
+import numpy as np
+import pandas as pd
+
 from src.data_handler import fetch_stock_data, calculate_portfolio_metrics
-from src.portfolio_model import create_quadratic_program
+from src.portfolio_model import create_quadratic_program, get_qubo
 from src.solver import find_best_penalty, solve_with_classical_optimizer, solve_with_qaoa
-
-# We need this specific converter for the QAOA part
-from qiskit_optimization.converters import QuadraticProgramToQubo
-from qiskit_optimization.problems import QuadraticProgram
-
-
-def find_latest_results_file(directory: str, file_prefix: str) -> str | None:
-    """Return the most recent CSV file in `directory` that starts with `file_prefix`."""
-    if not os.path.exists(directory):
-        return None
-    files = [os.path.join(directory, f) for f in os.listdir(
-        directory) if f.startswith(file_prefix) and f.endswith('.csv')]
-    if not files:
-        return None
-    files.sort(key=os.path.getmtime, reverse=True)
-    return files[0]
+from src.utils import (
+    save_results,
+    plot_portfolio_weights,
+    plot_efficient_frontier,
+    generate_comparison_report,
+)
 
 
-def main():
-    """Entry point for running the portfolio optimization pipeline."""
-    print("--- Portfolio optimization run ---")
+def main() -> None:
+    """Run one end-to-end optimisation: data -> model -> classical + QAOA -> plots + report."""
 
-    # Generate a unique timestamp for this run
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    print(f"Starting new run with timestamp: {timestamp}\n")
+    # --- Basic config for this toy project ---
+    tickers = [
+        "AAPL",
+        "AMZN",
+        "GOOG",
+        "KO",
+        "META",
+        "MSFT",
+        "NFLX",
+        "NVDA",
+        "SBUX",
+        "TSLA",
+    ]
+    start_date = "2020-01-01"
+    end_date = "2024-01-01"
 
-    # --- Configuration ---
-    tickers = ['AAPL', 'AMZN', 'GOOG', 'KO', 'META',
-               'MSFT', 'NFLX', 'NVDA', 'SBUX', 'TSLA']
-    start_date = '2020-01-01'
-    end_date = '2024-01-01'
-    num_assets_to_select = 5
+    # How many assets we want in the final portfolio
+    num_assets_to_select = 4
+
+    # Trade-off between return and risk in the objective
     risk_factor = 0.5
 
-    # --- Step 1: Data Handling ---
-    print("1. Fetching and analyzing data...")
-    stock_data = fetch_stock_data(tickers, start_date, end_date)
+    print("=== Quantum / classical portfolio optimisation (toy model) ===")
+
+    # --- Step 1: fetch market data ---
+    print("\n1) Downloading historical data ...")
+    price_data = fetch_stock_data(tickers, start_date, end_date)
+
+    # --- Step 2: build simple return / risk estimates ---
     expected_returns, covariance_matrix, asset_names = calculate_portfolio_metrics(
-        stock_data, risk_factor, num_assets_to_select)
+        price_data, num_assets_to_select
+    )
 
-    # --- Step 2: Classical Optimization ---
-    print("\n2. Solving the model classically (NumPyMinimumEigensolver)...")
+    # --- Step 3: formulate the quadratic program ---
+    print("\n2) Building the optimisation model ...")
     qp = create_quadratic_program(
-        expected_returns, covariance_matrix, num_assets_to_select)
+        expected_returns,
+        covariance_matrix,
+        num_assets_to_select,
+        risk_factor,
+    )
+
+    # --- Step 4: solve classically ---
+    print("\n3) Solving with a classical eigensolver ...")
     classical_solution = solve_with_classical_optimizer(qp)
+    print("   Classical selection (0/1):", classical_solution.astype(int).tolist())
 
-    # --- Step 3: QAOA Optimization ---
-    print("\n3. Solving the same model with QAOA...")
-    penalty_range = np.arange(10, 201, 10)
-    best_penalty = find_best_penalty(qp, penalty_range)
+    # --- Step 5: try a QAOA-based solution ---
+    print("\n4) Searching for a reasonable penalty for the QUBO encoding ...")
+    penalty_values = np.linspace(5, 50, 10)
+    best_penalty = find_best_penalty(qp, penalty_values)
 
-    if best_penalty:
-        qp_to_qubo = QuadraticProgramToQubo(penalty=best_penalty)
-        qubo = qp_to_qubo.convert(qp)
+    if best_penalty is not None:
+        print(f"   Using penalty = {best_penalty}")
+        qubo = get_qubo(qp, best_penalty)
+        print("\n5) Running QAOA on the same problem ...")
         qaoa_solution = solve_with_qaoa(qubo)
+        print("   QAOA selection (0/1):", qaoa_solution.astype(int).tolist())
     else:
-        print("Could not find a feasible penalty factor. Skipping QAOA.")
-        qaoa_solution = np.zeros(len(asset_names))
+        print("   Failed to find a sensible penalty; falling back to classical-only solution.")
+        qaoa_solution = np.zeros_like(classical_solution)
 
-    # --- Step 4: Save and Plot Results ---
-    print("\n4. Saving and plotting results...")
-    # Plot the portfolio weights
-    plot_portfolio_weights(qaoa_solution, classical_solution,
-                           'weights_comparison', timestamp, asset_names)
-
-    # Plot the efficient frontier and highlight both solutions
-    plot_efficient_frontier(expected_returns, covariance_matrix,
-                            classical_solution, qaoa_solution, 'efficient_frontier', timestamp)
-
-    # Save the solutions to a CSV file
-    results_data = {
-        'Asset': asset_names,
-        'Classical Solution': classical_solution,
-        'QAOA Solution': qaoa_solution
-    }
-    save_results('solutions.csv', results_data, timestamp)
-
-    # --- Step 5: Generate Comparison Report ---
-    print("\n5. Generating comparison report...")
+    # --- Step 6: save results, plots and comparison report ---
+    print("\n6) Saving results and generating plots ...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = "results"
-    all_solution_files = sorted([f for f in os.listdir(output_dir) if f.startswith(
-        'solutions_') and f.endswith('.csv')], reverse=True)
 
+    results_data = {
+        "Asset": asset_names,
+        "Classical Solution": classical_solution.astype(int),
+        "QAOA Solution": qaoa_solution.astype(int),
+    }
+
+    save_results("solutions", results_data, timestamp, output_dir=output_dir)
+    plot_portfolio_weights(
+        qaoa_solution,
+        classical_solution,
+        "weights_comparison",
+        timestamp,
+        asset_names,
+        output_dir=output_dir,
+    )
+    plot_efficient_frontier(
+        expected_returns,
+        covariance_matrix,
+        classical_solution,
+        qaoa_solution,
+        "efficient_frontier",
+        timestamp,
+        output_dir=output_dir,
+    )
+
+    # Build a tiny history-based report
+    print("\n7) Generating Markdown comparison report ...")
     current_results_df = pd.DataFrame(results_data)
     previous_results_df = None
 
-    if len(all_solution_files) > 1:
-        latest_file_path = os.path.join(output_dir, all_solution_files[0])
-        previous_file_path = os.path.join(output_dir, all_solution_files[1])
+    # Look for previous 'solutions_*.csv' files
+    solution_files = sorted(
+        [
+            f
+            for f in os.listdir(output_dir)
+            if f.startswith("solutions_") and f.endswith(".csv")
+        ],
+        reverse=True,
+    )
+
+    if len(solution_files) > 1:
+        previous_file_path = os.path.join(output_dir, solution_files[1])
         try:
-            previous_results_df = pd.read_csv(
-                previous_file_path, encoding='utf-8')
-            previous_results_df = previous_results_df[[
-                'Asset', 'Classical Solution', 'QAOA Solution']]
-        except Exception as e:
-            print(f"Could not load previous results file for comparison: {e}")
-            pass
-    else:
-        print("Skipping comparison report as this is the first run or only one run exists.")
+            previous_results_df = pd.read_csv(previous_file_path)
+            print(f"Comparing against previous run in {previous_file_path}")
+        except Exception as exc:
+            print(f"Could not load previous results file for comparison: {exc}")
 
-    generate_comparison_report(os.path.join(output_dir, f"comparison_report_{timestamp}.md"),
-                               current_results_df, previous_results_df, timestamp, asset_names)
+    report_path = os.path.join(output_dir, f"comparison_report_{timestamp}.md")
+    generate_comparison_report(
+        report_path,
+        current_results_df,
+        previous_results_df,
+        timestamp,
+        asset_names,
+    )
 
-    print("\nProject run finished successfully!")
+    print("\nFinished.\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
