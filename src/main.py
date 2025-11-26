@@ -13,6 +13,7 @@ from src.utils import (
     plot_portfolio_weights,
     plot_efficient_frontier,
     generate_comparison_report,
+    _portfolio_summary,
 )
 
 
@@ -148,3 +149,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
